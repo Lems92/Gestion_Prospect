@@ -1,0 +1,5 @@
+Flask==2.0.1
+psycopg2-binary
+pandas
+openpyxl
+flask_sqlalchemy
