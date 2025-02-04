@@ -1,10 +1,10 @@
 from flask import Blueprint, jsonify, request
-from models import db, Prospect
+from app.models import db, Prospect
 import pandas as pd
 
 prospect_bp = Blueprint('prospect', __name__)
 
-#recherche filtre prospect
+# Recherche filtrée des prospects
 @prospect_bp.route('/prospects', methods=['GET'])
 def get_prospects():
     query = Prospect.query
@@ -16,26 +16,18 @@ def get_prospects():
         query = query.filter(Prospect.company.ilike(f"%{request.args['company']}%"))
     if 'title' in request.args:
         query = query.filter(Prospect.title.ilike(f"%{request.args['title']}%"))
-
+    
     prospects = query.all()
     return jsonify([prospect.to_dict() for prospect in prospects])
 
-#prospect unique
+# Prospect unique
 @prospect_bp.route('/prospects/<int:id>', methods=['GET'])
 def get_prospect(id):
     prospect = Prospect.query.get_or_404(id)
     return jsonify(prospect.to_dict())
 
-#Créer prospect
-@prospect_bp.route('/prospects', methods=['POST'])
-def create_prospect():
-    data = request.json
-    prospect = Prospect(**data)
-    db.session.add(prospect)
-    db.session.commit()
-    return jsonify(prospect.to_dict()), 201
 
-# UPDATE prospect
+# Mettre à jour un prospect
 @prospect_bp.route('/prospects/<int:id>', methods=['PUT'])
 def update_prospect(id):
     data = request.json
@@ -45,7 +37,7 @@ def update_prospect(id):
     db.session.commit()
     return jsonify(prospect.to_dict())
 
-# DELETE prospect
+# Supprimer un prospect
 @prospect_bp.route('/prospects/<int:id>', methods=['DELETE'])
 def delete_prospect(id):
     prospect = Prospect.query.get_or_404(id)
@@ -53,53 +45,91 @@ def delete_prospect(id):
     db.session.commit()
     return '', 204
 
-# UPLOAD fichier CSV ou XLSX
+# Upload de fichier 
 @prospect_bp.route('/upload', methods=['POST'])
 def upload_file():
-    file = request.files['file']
+    file = request.files.get('file')
+    if not file:
+        return 'No file provided', 400
+    
+    if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        return 'Unsupported file type', 400
+    
     if file.filename.endswith('.csv'):
         df = pd.read_csv(file)
     elif file.filename.endswith('.xlsx'):
         df = pd.read_excel(file)
-    else:
-        return 'Unsupported file type', 400
+
+    expected_columns = ['Civility', 'First Name', 'Last Name', 'Company linkedIn', 'Linkedin Url', 
+                        'Intent signal', 'Other 1', 'Other 2', 'Other 3', 'Company', 'Title', 'E-mail', 
+                        'Status', 'Priority', 'Mobile Phone', 'Direct line', 'Switchboard', 'Other phone 1', 
+                        'Other phone 2', 'Job description', 'Company website', 'Years in position', 
+                        'Years in company', 'Industry', 'CA', 'Company employee count', 
+                        'Company employee range', 'Company year founded', 'Company description', 'VAT', 
+                        'HEADQUARTERS PC', 'HEADQUARTERS CITY', 'Adress']
+    
+    missing_columns = [col for col in expected_columns if col not in df.columns]
+    if missing_columns:
+        return jsonify({'error': f'Missing columns: {", ".join(missing_columns)}'}), 400
+    
+    print("Données extraites du fichier :")
+    print(df.head())
+
+    # Remplacer les valeurs NaN par des valeurs par défaut
+    df = df.fillna({
+        'Civility': '', 'First Name': '', 'Last Name': '', 'Company linkedIn': '', 'Linkedin Url': '',
+        'Intent signal': '', 'Other 1': '', 'Other 2': '', 'Other 3': '', 'Company': '', 'Title': '', 
+        'E-mail': '', 'Status': '', 'Priority': '', 'Mobile Phone': '', 'Direct line': '', 'Switchboard': '',
+        'Other phone 1': '', 'Other phone 2': '', 'Job description': '', 'Company website': '', 
+        'Years in position': 0, 'Years in company': 0, 'Industry': '', 'CA': 0, 'Company employee count': 0, 
+        'Company employee range': '', 'Company year founded': 0, 'Company description': '', 'VAT': '',
+        'HEADQUARTERS PC': '', 'HEADQUARTERS CITY': '', 'Adress': ''
+    })
 
     for _, row in df.iterrows():
-        prospect = Prospect(
-            civility=row.get('civility'),
-            first_name=row.get('first_name'),
-            last_name=row.get('last_name'),
-            company_linkedin=row.get('company_linkedin'),
-            linkedin_url=row.get('linkedin_url'),
-            intent_signal=row.get('intent_signal'),
-            other_1=row.get('other_1'),
-            other_2=row.get('other_2'),
-            other_3=row.get('other_3'),
-            company=row.get('company'),
-            title=row.get('title'),
-            email=row.get('email'),
-            status=row.get('status'),
-            priority=row.get('priority'),
-            mobile_phone=row.get('mobile_phone'),
-            direct_line=row.get('direct_line'),
-            switchboard=row.get('switchboard'),
-            other_phone_1=row.get('other_phone_1'),
-            other_phone_2=row.get('other_phone_2'),
-            job_description=row.get('job_description'),
-            company_website=row.get('company_website'),
-            years_in_position=row.get('years_in_position'),
-            years_in_company=row.get('years_in_company'),
-            industry=row.get('industry'),
-            ca=row.get('ca'),
-            company_employee_count=row.get('company_employee_count'),
-            company_employee_range=row.get('company_employee_range'),
-            company_year_founded=row.get('company_year_founded'),
-            company_description=row.get('company_description'),
-            vat=row.get('vat'),
-            headquarters_pc=row.get('headquarters_pc'),
-            headquarters_city=row.get('headquarters_city'),
-            address=row.get('address')
-        )
-        db.session.add(prospect)
+        try:
+            email = row.get('E-mail')
+            if email and Prospect.query.filter_by(email=email).first():
+                print(f"{email} existe déjà.")
+                continue
+            prospect = Prospect(
+                civility=row.get('Civility'),
+                first_name=row.get('First Name'),
+                last_name=row.get('Last Name'),
+                company_linkedin=row.get('Company linkedIn'),
+                linkedin_url=row.get('Linkedin Url'),
+                intent_signal=row.get('Intent signal'),
+                other_1=row.get('Other 1'),
+                other_2=row.get('Other 2'),
+                other_3=row.get('Other 3'),
+                company=row.get('Company'),
+                title=row.get('Title'),
+                email=row.get('E-mail'),
+                status=row.get('Status'),
+                priority=row.get('Priority'),
+                mobile_phone=row.get('Mobile Phone'),
+                direct_line=row.get('Direct line'),
+                switchboard=row.get('Switchboard'),
+                other_phone_1=row.get('Other phone 1'),
+                other_phone_2=row.get('Other phone 2'),
+                job_description=row.get('Job description'),
+                company_website=row.get('Company website'),
+                years_in_position=row.get('Years in position'),
+                years_in_company=row.get('Years in company'),
+                industry=row.get('Industry'),
+                ca=row.get('CA'),
+                company_employee_count=row.get('Company employee count'),
+                company_employee_range=row.get('Company employee range'),
+                company_year_founded=row.get('Company year founded'),
+                company_description=row.get('Company description'),
+                vat=row.get('VAT'),
+                headquarters_pc=row.get('HEADQUARTERS PC'),
+                headquarters_city=row.get('HEADQUARTERS CITY'),
+                address=row.get('Adress')
+            )
+            db.session.add(prospect)
+        except Exception as e:
+            print(f"Erreur lors de l'ajout du prospect: {e}")
+
     db.session.commit()
     return 'File uploaded successfully', 200
