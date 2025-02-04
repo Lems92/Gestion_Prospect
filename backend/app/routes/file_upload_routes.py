@@ -12,7 +12,7 @@ def upload_file():
     elif file.filename.endswith('.xlsx'):
         df = pd.read_excel(file)
     else:
-        return 'Unsupported file type', 400
+        return 'Erreur de type de fichier', 400
 
     for _, row in df.iterrows():
         company = Company.query.filter_by(name=row.get('company')).first()
