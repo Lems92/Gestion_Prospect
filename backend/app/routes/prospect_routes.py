@@ -37,13 +37,7 @@ def update_prospect(id):
     db.session.commit()
     return jsonify(prospect.to_dict())
 
-# Supprimer un prospect
-@prospect_bp.route('/prospects/<int:id>', methods=['DELETE'])
-def delete_prospect(id):
-    prospect = Prospect.query.get_or_404(id)
-    db.session.delete(prospect)
-    db.session.commit()
-    return '', 204
+
 
 # Upload de fichier 
 @prospect_bp.route('/upload', methods=['POST'])
@@ -77,21 +71,16 @@ def upload_file():
 
     # Remplacer les valeurs NaN par des valeurs par défaut
     df = df.fillna({
-        'Civility': '', 'First Name': '', 'Last Name': '', 'Company linkedIn': '', 'Linkedin Url': '',
-        'Intent signal': '', 'Other 1': '', 'Other 2': '', 'Other 3': '', 'Company': '', 'Title': '', 
-        'E-mail': '', 'Status': '', 'Priority': '', 'Mobile Phone': '', 'Direct line': '', 'Switchboard': '',
-        'Other phone 1': '', 'Other phone 2': '', 'Job description': '', 'Company website': '', 
-        'Years in position': 0, 'Years in company': 0, 'Industry': '', 'CA': 0, 'Company employee count': 0, 
-        'Company employee range': '', 'Company year founded': 0, 'Company description': '', 'VAT': '',
-        'HEADQUARTERS PC': '', 'HEADQUARTERS CITY': '', 'Adress': ''
+        'E-mail':'NaN',
+        'Years in position': 0,
+        'Years in company': 0,
+        'CA': 0,
+        'Company employee count': 0,
+        'Company year founded': 0
     })
 
     for _, row in df.iterrows():
         try:
-            email = row.get('E-mail')
-            if email and Prospect.query.filter_by(email=email).first():
-                print(f"{email} existe déjà.")
-                continue
             prospect = Prospect(
                 civility=row.get('Civility'),
                 first_name=row.get('First Name'),
